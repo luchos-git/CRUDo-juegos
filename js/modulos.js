@@ -1,3 +1,5 @@
+// https://6a73b2b015e0453fe1b424ed.mockapi.io/juegos  usar post con el formulario de agregar juego y modificar juego, para que se guarde en la api y no en el localstorage
+
 const obtenerJuegos = () => JSON.parse(localStorage.getItem("juegos")) || [];
 
 const guardarJuegos = (juegos) => localStorage.setItem("juegos", JSON.stringify(juegos));
@@ -106,6 +108,7 @@ const agregarJuego = (nuevoJuego) => {
     mostrarMensaje("Juego agregado con éxito");
 };
 
+//eliminar juegos
 const eliminarJuego = (id) => {
     const juegos = obtenerJuegos();
     const juego = juegos[id - 1];
@@ -118,6 +121,7 @@ const eliminarJuego = (id) => {
     }
 };
 
+//modificar juegos
 const prepararEdicion = (id) => {
     const juegos = obtenerJuegos();
     const juego = juegos[id - 1];
