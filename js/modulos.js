@@ -1,8 +1,58 @@
 // https://6a73b2b015e0453fe1b424ed.mockapi.io/juegos  usar post con el formulario de agregar juego y modificar juego, para que se guarde en la api y no en el localstorage
 
+//////////////////////////////////////////
+//no se si se agrega las cosas agregadas por el usuario al mockapi
+// fetch('https://6a73b2b015e0453fe1b424ed.mockapi.io/juegos', {
+//     method: 'POST',
+//     headers: { 'content-type': 'application/json' },
+//     body: JSON.stringify(nuevoJuego)
+// })
+//     .then(res => {
+//         if (res.ok) {
+//             return res.json();
+//         }
+//         // handle error
+//     })
+//     .then(juegos => {
+//         document.querySelector().innerHTML=`<form action="" id="agregar">
+//                     <h3>agregar juego</h3>
+//                     <input type="text" name="titulo" placeholder="ingrese titulo" required>
+
+//                     <select name="genero" id="agregar-genero" required></select>
+//                     <input type="text" id="agregar-genero-otro" placeholder="ingrese nuevo genero" class="campo-otro">
+
+//                     <select name="consola" id="agregar-consola" required></select>
+//                     <input type="text" id="agregar-consola-otro" placeholder="ingrese nueva consola" class="campo-otro">
+
+//                     <input type="submit" name="submit" value="agregar">
+//                     <button type="button" id="b-cancelar-agregar">Cancelar</button>
+//                 </form>`
+//     })
+//     .catch(error => {
+//         // handle error
+//     });
+//////////////////////////////////////////
 const obtenerJuegos = () => JSON.parse(localStorage.getItem("juegos")) || [];
 
-const guardarJuegos = (juegos) => localStorage.setItem("juegos", JSON.stringify(juegos));
+//acá esta el fetch que si sube los datos agregados jeje
+const guardarJuegos = (juegos) => {
+     fetch('https://6a73b2b015e0453fe1b424ed.mockapi.io/juegos', {
+  method: 'POST',
+  headers: {'content-type':'application/json'},
+  // Send your data in the request body as JSON
+  body: JSON.stringify(juegos)
+}).then(res => {
+  if (res.ok) {
+      return res.json();
+  }
+  // handle error
+}).then(juego => {
+  console.log('Juego creado:', juego);
+}).catch(error => {
+  // handle error
+})
+}
+    // localStorage.setItem("juegos", JSON.stringify(juegos));
 
 const generosPorDefecto = ["Acción", "Aventura", "RPG", "Deportes", "Terror"];
 const consolasPorDefecto = ["PC", "PlayStation 5", "PlayStation 4", "PlayStation 3", "Xbox Series X/S", "Xbox One", "Xbox 360", "Nintendo Switch", "Nintendo Wii U", "Nintendo 3DS", "Mobile", "Steam Deck"];
