@@ -1,11 +1,13 @@
 // manejo de eventos de la pagina: que pasa cuando hago click, envio un formulario, etc
-// las funciones que uso ac (mostrarJuegos, agregarJuego, etc) estan en modulos.js
+// las funciones que uso aca (mostrarJuegos, agregarJuego, etc) estan en modulos.js
 
 // todo esto arranca recien cuando el html termino de cargar, para asegurarme de que los elementos ya existen
 document.addEventListener("DOMContentLoaded", () => {
 
-    // al entrar a la pagina muestro el listado completo (desde localStorage) y lleno los select
+    // muestro primero lo que haya en el cache local (para no dejar la pantalla en blanco)
+    // y despues traigo la version actualizada desde la api
     mostrarJuegos();
+    cargarJuegosDesdeApi();
     cargarSelects();
 
     // boton "agregar juegos", muestra el formulario para cargar un juego nuevo
@@ -39,23 +41,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = new FormData(e.target);
         const juego = Object.fromEntries(data.entries());
 
-        // si elegi "otro" en genero/consola, uso lo que escribi a mano y lo sumo a la lista para la proxima
+        // si elegi "otro" en genero/consola, uso lo que escribi a mano
+        // (ese genero/consola nuevo va a aparecer solo en los select cuando el juego se termine de subir a la api)
         if (juego.genero === "otro") {
             juego.genero = document.querySelector("#agregar-genero-otro").value.trim();
-            agregarGenero(juego.genero);
         }
         if (juego.consola === "otro") {
             juego.consola = document.querySelector("#agregar-consola-otro").value.trim();
-            agregarConsola(juego.consola);
         }
 
-        // agregarJuego guarda en localStorage y ademas manda el post a la api
+        // agregarJuego manda el post a la api y, cuando responde, actualiza el cache, el listado y los select
         agregarJuego(juego);
         e.target.reset();
         e.target.style.display = "none";
         document.querySelector("#agregar-genero-otro").style.display = "none";
         document.querySelector("#agregar-consola-otro").style.display = "none";
-        cargarSelects(); // por si agregue un genero/consola nuevo
     });
 
     // boton "cancelar" del formulario de agregar, lo limpia y lo oculta sin guardar nada
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         form.style.display = "none";
     });
 
-    // envio del formulario "buscar", filtra los juegos guardados en localStorage
+    // envio del formulario "buscar", filtra los juegos guardados en el cache local
     document.querySelector("#buscar").addEventListener("submit", (e) => {
         e.preventDefault();
         const titulo = e.target.titulo.value.toLowerCase();
@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // me quedo solo con los juegos que cumplen los 3 filtros a la vez
         // si un filtro esta vacio no se aplica esa condicion
-        const juegos = obtenerJuegosConId().filter(j =>
+        const juegos = obtenerJuegos().filter(j =>
             j.titulo.toLowerCase().includes(titulo) &&
             (genero === "" || j.genero === genero) &&
             (consola === "" || j.consola === consola)
@@ -105,15 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (juego.genero === "otro") {
             juego.genero = document.querySelector("#modificar-genero-otro").value.trim();
-            agregarGenero(juego.genero);
         }
         if (juego.consola === "otro") {
             juego.consola = document.querySelector("#modificar-consola-otro").value.trim();
-            agregarConsola(juego.consola);
         }
 
-        modificarJuego(juego); // guarda los cambios en localStorage
+        // modificarJuego manda el put a la api y, cuando responde, actualiza el cache, el listado y los select
+        modificarJuego(juego);
         e.target.style.display = "none"; // oculta el formulario tras guardar
-        cargarSelects();
     });
 });

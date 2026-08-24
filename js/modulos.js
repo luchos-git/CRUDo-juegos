@@ -1,68 +1,63 @@
-// los juegos se guardan en localStorage, es lo que usa toda la pagina para listar, buscar, editar y borrar
-// ademas, cada vez que se agrega un juego nuevo, tambien se manda a la api con post (por la consigna)
-// por ahora uso solo post, despues voy sumando get, put y delete de a poco
+// modulos.js: la api de mockapi es la fuente de datos real (coleccion "juegos").
+// localStorage se usa solo como cache local, para no tener que esperar la respuesta
+// de la api cada vez que se dibuja la lista. cada accion (agregar, modificar, eliminar)
+// hace el fetch correspondiente (POST/PUT/DELETE, mismo patron que el ejemplo de la
+// materia) y recien cuando la api confirma, se actualiza el cache y lo que se ve en pantalla.
+//
+// los generos y consolas YA NO se guardan aparte: se sacan directo de los juegos que hay
+// en el cache (o sea, de lo que subio la gente a la api). asi, si alguien carga un juego
+// con una consola nueva (por "otro"), esa consola nueva aparece sola en el filtro para
+// todos la proxima vez que se actualiza la lista, sin tener que guardarla por separado.
 
-// url de la api a donde mando los juegos con post
+// url de la api con la que trabajo
 const API_URL = 'https://6a73b2b015e0453fe1b424ed.mockapi.io/juegos';
 
-// lee el array de juegos de localStorage, si no hay nada devuelve vacio
+// lee el array de juegos guardado en el cache local, si no hay nada devuelve vacio
 const obtenerJuegos = () => JSON.parse(localStorage.getItem("juegos")) || [];
 
-// guarda el array completo en localStorage
-// esta es la posta, si no se llama a esto los cambios no quedan guardados
+// guarda el array completo en el cache local (esto NO toca la api, es solo el cache)
 const guardarJuegos = (juegos) => {
     localStorage.setItem("juegos", JSON.stringify(juegos));
 };
 
-// manda un solo juego a la api con post
-// el body tiene que ser el objeto del juego, no el array entero, porque cada post crea un registro nuevo
-const guardarJuegoEnApi = (juego) => {
+// trae todos los juegos de la api (GET) y con eso actualiza el cache local, el listado
+// y los select de genero/consola (porque dependen de los juegos que hay)
+// se llama al arrancar la pagina, para que siempre se vea lo que realmente hay en la api
+const cargarJuegosDesdeApi = () => {
     fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(juego)
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
     })
         .then(res => {
-            if (!res.ok) throw new Error('la api respondio con un error')
+            if (!res.ok) throw new Error('la api respondio con un error');
             return res.json();
         })
-        .then(juegoCreado => {
-            console.log('juego creado en la api:', juegoCreado);
+        .then(juegos => {
+            guardarJuegos(juegos);
+            mostrarJuegos();
+            cargarSelects();
         })
         .catch(error => {
-            // si falla el post (por ej sin conexion) el juego ya quedo en localStorage, no se pierde
-            console.error('no se pudo guardar el juego en la api:', error);
+            // si no hay conexion sigo mostrando lo ultimo que quedo en el cache local
+            console.error('no se pudieron cargar los juegos desde la api:', error);
         });
 };
 
-// listas por defecto por si todavia no hay nada guardado
+// listas por defecto, por si todavia no hay ningun juego cargado
 const generosPorDefecto = ["Acción", "Aventura", "RPG", "Deportes", "Terror"];
 const consolasPorDefecto = ["PC", "PlayStation 5", "PlayStation 4", "PlayStation 3", "Xbox Series X/S", "Xbox One", "Xbox 360", "Nintendo Switch", "Nintendo Wii U", "Nintendo 3DS", "Mobile", "Steam Deck"];
 
-// si localStorage tiene algo lo uso, si no uso las listas de arriba
-const obtenerGeneros = () => JSON.parse(localStorage.getItem("generos")) || generosPorDefecto;
-const obtenerConsolas = () => JSON.parse(localStorage.getItem("consolas")) || consolasPorDefecto;
-
-// guardan el array actualizado en localStorage
-const guardarGeneros = (generos) => localStorage.setItem("generos", JSON.stringify(generos));
-const guardarConsolas = (consolas) => localStorage.setItem("consolas", JSON.stringify(consolas));
-
-// agrega un genero nuevo a la lista, solo si no esta ya
-const agregarGenero = (genero) => {
-    const generos = obtenerGeneros();
-    if (genero && !generos.includes(genero)) {
-        generos.push(genero);
-        guardarGeneros(generos);
-    }
+// arma la lista de generos: los de por defecto + los que ya tienen los juegos del cache
+// (osea, los que subio la gente a la api), sin repetidos. uso un Set para sacar los duplicados
+const obtenerGeneros = () => {
+    const generosDeJuegos = obtenerJuegos().map(j => j.genero);
+    return Array.from(new Set([...generosPorDefecto, ...generosDeJuegos]));
 };
 
-// lo mismo que agregarGenero pero para consolas
-const agregarConsola = (consola) => {
-    const consolas = obtenerConsolas();
-    if (consola && !consolas.includes(consola)) {
-        consolas.push(consola);
-        guardarConsolas(consolas);
-    }
+// lo mismo que obtenerGeneros pero para consolas
+const obtenerConsolas = () => {
+    const consolasDeJuegos = obtenerJuegos().map(j => j.consola);
+    return Array.from(new Set([...consolasPorDefecto, ...consolasDeJuegos]));
 };
 
 // llena un select con las opciones que le paso
@@ -105,16 +100,13 @@ const seleccionarValorActual = (selectorSelect, selectorOtro, valorActual) => {
     }
 };
 
-// devuelve los juegos con un id = posicion en el vector + 1
-// este id es solo para uso interno de la pagina (botones modificar/eliminar)
-const obtenerJuegosConId = () => obtenerJuegos().map((j, i) => ({ ...j, id: i + 1 }));
-
 // dibuja la lista de juegos en pantalla
 // si le paso un array por parametro (por ej resultado de una busqueda) muestra ese array
-// si no le paso nada, muestra el listado completo
+// si no le paso nada, muestra el listado completo (del cache local)
+// el id de cada juego es el que le asigna la api (mockapi), no una posicion inventada
 const mostrarJuegos = (juegos = null) => {
     const listado = document.querySelector("#listado");
-    const datos = juegos !== null ? juegos : obtenerJuegosConId();
+    const datos = juegos !== null ? juegos : obtenerJuegos();
     const btnInicio = document.querySelector("#b-inicio");
 
     // el boton "volver al inicio" solo se muestra cuando estoy viendo un resultado filtrado
@@ -129,8 +121,8 @@ const mostrarJuegos = (juegos = null) => {
                 <p>${j.genero} - ${j.consola}</p>
             </div>
             <div class="botones">
-                <button class="b-modificar" onclick="prepararEdicion(${j.id})">Modificar</button>
-                <button class="b-eliminar" onclick="eliminarJuego(${j.id})">Eliminar</button>
+                <button class="b-modificar" onclick="prepararEdicion('${j.id}')">Modificar</button>
+                <button class="b-eliminar" onclick="eliminarJuego('${j.id}')">Eliminar</button>
             </div>
         </div>`;
     });
@@ -147,35 +139,63 @@ const mostrarSinResultados = () => {
         </div>`;
 };
 
-// agrega un juego nuevo, lo guarda en localStorage (para que se vea en la lista) y ademas lo manda a la api con post
+// crea el juego en la api (POST) y, si sale bien, lo agrega al cache local con el id que le dio la api
+// tambien vuelve a cargar los select, por si el juego trae un genero/consola nuevo (cargado por "otro")
 const agregarJuego = (nuevoJuego) => {
-    const juegos = obtenerJuegos();
-    juegos.push(nuevoJuego);
-    guardarJuegos(juegos);
-
-    guardarJuegoEnApi(nuevoJuego);
-
-    mostrarJuegos();
-    mostrarMensaje("Juego agregado con éxito");
+    fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoJuego)
+    })
+        .then(res => {
+            if (!res.ok) throw new Error('la api respondio con un error');
+            return res.json();
+        })
+        .then(juegoCreado => {
+            // juegoCreado ya viene con el id que le asigno mockapi
+            const juegos = obtenerJuegos();
+            juegos.push(juegoCreado);
+            guardarJuegos(juegos);
+            mostrarJuegos();
+            cargarSelects();
+            mostrarMensaje("Juego agregado con éxito");
+        })
+        .catch(error => {
+            console.error('no se pudo agregar el juego en la api:', error);
+            mostrarMensaje("No se pudo agregar el juego, probá de nuevo");
+        });
 };
 
-// elimina un juego (por ahora, solo de localStorage)
+// borra el juego en la api (DELETE por id) y, si sale bien, lo saca tambien del cache local
 const eliminarJuego = (id) => {
-    const juegos = obtenerJuegos();
-    const juego = juegos[id - 1];
+    const juego = obtenerJuegos().find(j => j.id === id);
     if (!juego) return;
-    if (confirm(`¿Seguro que querés eliminar "${juego.titulo}"?`)) {
-        juegos.splice(id - 1, 1);
-        guardarJuegos(juegos);
-        mostrarJuegos();
-        mostrarMensaje("juego eliminado");
-    }
+    if (!confirm(`¿Seguro que querés eliminar "${juego.titulo}"?`)) return;
+
+    fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(res => {
+            if (!res.ok) throw new Error('la api respondio con un error');
+            return res.json();
+        })
+        .then(() => {
+            const juegos = obtenerJuegos().filter(j => j.id !== id);
+            guardarJuegos(juegos);
+            mostrarJuegos();
+            cargarSelects();
+            mostrarMensaje("juego eliminado");
+        })
+        .catch(error => {
+            console.error('no se pudo eliminar el juego en la api:', error);
+            mostrarMensaje("No se pudo eliminar el juego, probá de nuevo");
+        });
 };
 
 // prepara y muestra el formulario de edicion para el juego con ese id
 const prepararEdicion = (id) => {
-    const juegos = obtenerJuegos();
-    const juego = juegos[id - 1];
+    const juego = obtenerJuegos().find(j => j.id === id);
     if (!juego) return;
     const form = document.querySelector("#modificar");
 
@@ -222,18 +242,37 @@ const prepararEdicion = (id) => {
     });
 };
 
-// guarda los cambios de edicion (por ahora, solo en localStorage)
+// actualiza el juego en la api (PUT por id) y, si sale bien, actualiza tambien el cache local
+// y los select, por si el juego editado trae un genero/consola nuevo
 const modificarJuego = (datos) => {
-    let juegos = obtenerJuegos();
-    const index = Number(datos.id) - 1;
-    if (index >= 0 && index < juegos.length) {
-        juegos[index] = {
-            titulo: datos.titulo,
-            genero: datos.genero,
-            consola: datos.consola
-        };
-        guardarJuegos(juegos);
-        mostrarJuegos();
-        mostrarMensaje("juego actualizado");
-    }
+    const juegoActualizado = {
+        titulo: datos.titulo,
+        genero: datos.genero,
+        consola: datos.consola
+    };
+
+    fetch(`${API_URL}/${datos.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(juegoActualizado)
+    })
+        .then(res => {
+            if (!res.ok) throw new Error('la api respondio con un error');
+            return res.json();
+        })
+        .then(juegoDesdeApi => {
+            const juegos = obtenerJuegos();
+            const index = juegos.findIndex(j => j.id === datos.id);
+            if (index !== -1) {
+                juegos[index] = juegoDesdeApi;
+                guardarJuegos(juegos);
+            }
+            mostrarJuegos();
+            cargarSelects();
+            mostrarMensaje("juego actualizado");
+        })
+        .catch(error => {
+            console.error('no se pudo actualizar el juego en la api:', error);
+            mostrarMensaje("No se pudo actualizar el juego, probá de nuevo");
+        });
 };
